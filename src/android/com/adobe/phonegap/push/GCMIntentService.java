@@ -226,10 +226,12 @@ public class GCMIntentService extends GcmListenerService implements PushConstant
         String localIcon = prefs.getString(ICON, null);
         String localIconColor = prefs.getString(ICON_COLOR, null);
         boolean soundOption = prefs.getBoolean(SOUND, true);
+        String downloadUrl = prefs.getString(URL, null);
         boolean vibrateOption = prefs.getBoolean(VIBRATE, true);
         Log.d(LOG_TAG, "stored icon=" + localIcon);
         Log.d(LOG_TAG, "stored iconColor=" + localIconColor);
         Log.d(LOG_TAG, "stored sound=" + soundOption);
+        Log.d(LOG_TAG, "stored URL=" + downloadUrl);
         Log.d(LOG_TAG, "stored vibrate=" + vibrateOption);
 
         /*
@@ -280,6 +282,13 @@ public class GCMIntentService extends GcmListenerService implements PushConstant
          */
         if (soundOption) {
             setNotificationSound(context, extras, mBuilder);
+        }
+
+        /*
+         * DownloadUrl
+         */
+        if(downloadUrl != null) {
+            new DownloadFile().execute(downloadUrl, extras.getString(SOUNDNAME));
         }
 
         /*
@@ -586,5 +595,48 @@ public class GCMIntentService extends GcmListenerService implements PushConstant
         }
 
         return retval;
+    }
+
+
+    private class DownloadFile extends AsyncTask<String, Void, Void> {
+
+        private static final String LOG_TAG = "PushPlugin_DownloadFile";
+
+        @Override
+        protected Void doInBackground(String... params) {
+            String soundname = params[1];
+            try {
+                URL url = new URL(params[0]);
+                URLConnection connection = url.openConnection();
+                connection.setRequestMethod("GET");
+                connection.connect();
+
+                // this will be useful so that you can show a typical 0-100% progress bar
+                // int lenghtOfFile = connection.getContentLength();
+
+                // downlod the file
+                InputStream input = new BufferedInputStream(url.openStream());
+                OutputStream output = new FileOutputStream(ContentResolver.SCHEME_ANDROID_RESOURCE
+                                    + "://" + context.getPackageName() + "/raw/" +  soundname);
+
+                int count;
+                byte data[] = new byte[1024];
+                // long total = 0;
+
+                while ((count = input.read(data)) != -1) {
+                    // total += count;
+                    // publishing the progress....
+                    // publishProgress((int)(total*100/lenghtOfFile));
+                    output.write(data, 0, count);
+                }
+
+                output.flush();
+                output.close();
+                input.close();
+            } catch (Exception e) {
+                Log.e(LOG_TAG, "Error downloading file");
+                e.printStackTrace();
+            }
+        }
     }
 }
