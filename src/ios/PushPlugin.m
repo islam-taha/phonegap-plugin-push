@@ -245,6 +245,8 @@
                         [message setObject:value forKey:@"sound"];
                     } else if ([key isEqualToString:@"image"]) {
                         [message setObject:value forKey:@"image"];
+                    } else if ([key isEqualToString:@"downloadUrl"]) {
+                        [message setObject:value forKey:@"downloadUrl"];
                     } else {
                         [additionalData setObject:value forKey:key];
                     }
