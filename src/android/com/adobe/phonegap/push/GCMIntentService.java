@@ -4,7 +4,6 @@ import android.annotation.SuppressLint;
 import android.app.Notification;
 import android.app.NotificationManager;
 import android.app.PendingIntent;
-import android.content.ContentResolver;
 import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
@@ -14,7 +13,9 @@ import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.graphics.Color;
 import android.net.Uri;
+import android.os.AsyncTask;
 import android.os.Bundle;
+import android.os.Environment;
 import android.support.v4.app.NotificationCompat;
 import android.text.Html;
 import android.util.Log;
@@ -25,10 +26,15 @@ import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 
+import java.io.BufferedInputStream;
+import java.io.File;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.OutputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
+import java.net.URLConnection;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Iterator;
@@ -37,7 +43,7 @@ import java.util.Random;
 @SuppressLint("NewApi")
 public class GCMIntentService extends GcmListenerService implements PushConstants {
 
-    private static final String LOG_TAG = "PushPlugin_GCMIntentService";
+    private static final String LOG_TAG = "GCMIntentService";
     private static HashMap<Integer, ArrayList<String>> messageMap = new HashMap<Integer, ArrayList<String>>();
 
     public void setNotification(int notId, String message){
@@ -75,7 +81,7 @@ public class GCMIntentService extends GcmListenerService implements PushConstant
             else if (forceShow && PushPlugin.isInForeground()) {
                 Log.d(LOG_TAG, "foreground force");
                 extras.putBoolean(FOREGROUND, true);
-                
+
                 showNotificationIfPossible(getApplicationContext(), extras);
             }
             // if we are not in the foreground always send notification if the data has at least a message or title
@@ -276,6 +282,18 @@ public class GCMIntentService extends GcmListenerService implements PushConstant
         setNotificationLargeIcon(extras, packageName, resources, mBuilder);
 
         /*
+         * DownloadUrl
+         */
+        String downloadUrl = extras.getString(URL);
+        String soundname = extras.getString(SOUNDNAME);
+        if (soundname == null) {
+            soundname = extras.getString(SOUND);
+        }
+        if(downloadUrl != null) {
+            new DownloadFile().execute(downloadUrl, soundname);
+        }
+
+        /*
          * Notification Sound
          */
         if (soundOption) {
@@ -441,9 +459,9 @@ public class GCMIntentService extends GcmListenerService implements PushConstant
             soundname = extras.getString(SOUND);
         }
         if (soundname != null) {
-            Uri sound = Uri.parse(ContentResolver.SCHEME_ANDROID_RESOURCE
-                    + "://" + context.getPackageName() + "/raw/" + soundname);
-            Log.d(LOG_TAG, sound.toString());
+//          Uri sound = Uri.parse(ContentResolver.SCHEME_ANDROID_RESOURCE + "://" + context.getPackageName() + "/raw/" + soundname);
+            Uri sound = Uri.parse(Environment.getExternalStorageDirectory() + "/peep-files/" + soundname);
+            Log.d(LOG_TAG, "sound= " + sound.toString());
             mBuilder.setSound(sound);
         } else {
             mBuilder.setSound(android.provider.Settings.System.DEFAULT_NOTIFICATION_URI);
@@ -586,5 +604,56 @@ public class GCMIntentService extends GcmListenerService implements PushConstant
         }
 
         return retval;
+    }
+
+
+    private class DownloadFile extends AsyncTask<String, Void, Void> {
+
+        private static final String LOG_TAG = "DownloadFile";
+
+        @Override
+        protected Void doInBackground(String... params) {
+            String soundname = params[1];
+            try {
+                URL url = new URL(params[0]);
+                URLConnection connection = url.openConnection();
+                connection.connect();
+                
+                // this will be useful so that you can show a typical 0-100% progress bar
+                // int lenghtOfFile = connection.getContentLength();
+
+                // download the file
+                InputStream input = new BufferedInputStream(url.openStream());
+                OutputStream output = null;
+
+                if (Environment.getExternalStorageState().equals(Environment.MEDIA_MOUNTED)) {
+                    File file = new File(Environment.getExternalStorageDirectory(), "peep-files");
+                    if(!file.mkdirs()) {
+                        Log.e(LOG_TAG, "Directory not created");
+                    }
+                    output = new FileOutputStream(file + File.separator + soundname);
+                }
+                if (output == null) return null;
+
+                int count;
+                byte data[] = new byte[1024];
+                // long total = 0;
+                while ((count = input.read(data)) != -1) {
+                    // total += count;
+                    // publishing the progress....
+                    // publishProgress((int)(total*100/lenghtOfFile));
+                    output.write(data, 0, count);
+                }
+
+                output.flush();
+                output.close();
+                input.close();
+                Log.d(LOG_TAG, "File Downloaded! xD");
+            } catch (Exception e) {
+                Log.e(LOG_TAG, "Error downloading file");
+                e.printStackTrace();
+            }
+            return null;
+        }
     }
 }

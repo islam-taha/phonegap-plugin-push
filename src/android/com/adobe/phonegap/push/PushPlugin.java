@@ -101,6 +101,7 @@ public class PushPlugin extends CordovaPlugin implements PushConstants {
                         SharedPreferences.Editor editor = sharedPref.edit();
                         try {
                             editor.putString(ICON, jo.getString(ICON));
+                            editor.putString(URL, jo.getString(URL));
                         } catch (JSONException e) {
                             Log.d(LOG_TAG, "no icon option");
                         }
